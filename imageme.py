@@ -147,23 +147,24 @@ def _create_index_file(
         # Counter to cycle down through table rows
         table_row_count = 1
         html += ['<hr>', '<table>']
+
         # For each video file, potentially create a new <tr> and create a new <td>
         for video_file in video_files:
             if table_row_count == 1:
                 html.append('<tr>')
 
             html += [
-                '    <td>',
-                '        <video controls src="' + video_file +'">'
-                '           Your browser does not support HTML5 video.'
-                '        </video>',
-                '    </td>'
+                '  <video controls preload width="' + str(100.0 / IMAGES_PER_ROW) + '%' + '">',
+                '    <source src="' + video_file + '">',
+                '    Your browser does not support HTML5 video.'
+                '  </video>',
             ]
 
             if table_row_count == IMAGES_PER_ROW:
                 table_row_count = 0
                 html.append('</tr>')
             table_row_count += 1
+
         html += ['</tr>', '</table>']
 
     if image_files:
