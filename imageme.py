@@ -485,4 +485,8 @@ def serve_dir(dir_path):
 if __name__ == '__main__':
     # Generate indices and serve from the current directory downwards when run
     # as the entry point
+
+    if sys.argv[2:] and os.path.isdir(sys.argv[2]):
+        os.chdir(sys.argv[2])
+
     serve_dir('.')
