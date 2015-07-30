@@ -12,6 +12,7 @@ what's called.
 
 # Dependencies
 import base64, io, os, re, sys, threading, SimpleHTTPServer, SocketServer
+
 # Attempt to import PIL - if it doesn't exist we won't be able to make use of
 # some performance enhancing goodness, but imageMe will still work fine
 PIL_ENABLED = False
@@ -308,15 +309,6 @@ def _get_index_file_path(location):
     """
     return os.path.join(location, INDEX_FILE_NAME)
 
-def _get_server_port():
-    """
-    Get the port specified for the server to run on. If given as the first
-    command line argument, we'll use that. Else we'll default to 8000.
-
-    @return {Integer} The port to run the server on. Default 8000, overridden
-        by first command line argument.
-    """
-    return int(sys.argv[1]) if len(sys.argv) >= 2 else 8000
 
 def _get_src_from_image(img, fallback_image_file):
     """
@@ -416,31 +408,35 @@ def _get_thumbnail_src_from_file(dir_path, image_file, force_no_processing=False
     img = _get_thumbnail_image_from_file(dir_path, image_file)
     return _get_src_from_image(img, image_file)
 
-def _run_server():
+def _run_server(port):
     """
     Run the image server. This is blocking. Will handle user KeyboardInterrupt
     and other exceptions appropriately and return control once the server is
     stopped.
 
+    @param {Int} port - The port number which should be used by the server.
+
     @return {None}
     """
-    # Get the port to run on
-    port = _get_server_port()
+
     # Configure allow_reuse_address to make re-runs of the script less painful -
     # if this is not True then waiting for the address to be freed after the
     # last run can block a subsequent run
     SocketServer.TCPServer.allow_reuse_address = True
+
     # Create the server instance
     server = SocketServer.TCPServer(
         ('', port),
         SimpleHTTPServer.SimpleHTTPRequestHandler
     )
+
     # Print out before actually running the server (cheeky / optimistic, however
     # you want to look at it)
     print('Your images are at http://127.0.0.1:%d/%s' % (
         port,
         INDEX_FILE_NAME
     ))
+
     # Try to run the server
     try:
         # Run it - this call blocks until the server is killed
@@ -455,19 +451,23 @@ def _run_server():
         print(exptn)
         print('Unhandled exception in server, stopping')
 
-def serve_dir(dir_path):
+def serve_dir(port, dir_path):
     """
     Generate indexes and run server from the given directory downwards.
+
+    @param {Int} port - The port number which should be used by the server.
 
     @param {String} dir_path - The directory path (absolute, or relative to CWD)
 
     @return {None}
     """
+
     # Create index files, and store the list of their paths for cleanup later
     # This time, force no processing - this gives us a fast first-pass in terms
     # of page generation, but potentially slow serving for large image files
     print('Performing first pass index file generation')
     created_files = _create_index_files(dir_path, True)
+
     if (PIL_ENABLED):
         # If PIL is enabled, we'd like to process the HTML indexes to include
         # generated thumbnails - this slows down generation so we don't do it
@@ -476,17 +476,49 @@ def serve_dir(dir_path):
         print('Performing PIL-enchanced optimised index file generation in background')
         background_indexer = BackgroundIndexFileGenerator(dir_path)
         background_indexer.run()
+
     # Run the server in the current location - this blocks until it's stopped
-    _run_server()
+    _run_server(port)
+
     # Clean up the index files created earlier so we don't make a mess of
     # the image directories
     _clean_up(created_files)
+
+def usage():
+    help_message = '''
+usage: imageme [-h] [port] [dir]
+
+positional arguments:
+      port                  The port number for server to listen. Default is 8000
+      dir                   The root directory for server to run. Default is "."
+
+optional arguments:
+      -h, --help            Show this help message and exit
+
+    '''
+    print(help_message)
+
 
 if __name__ == '__main__':
     # Generate indices and serve from the current directory downwards when run
     # as the entry point
 
-    if sys.argv[2:] and os.path.isdir(sys.argv[2]):
-        os.chdir(sys.argv[2])
+    port = 8000
+    if sys.argv[1:]:
+        if sys.argv[1] == '-h':
+            usage()
+            sys.exit()
+        elif sys.argv[1].isdigit():
+            port = int(sys.argv[1])
+        else:
+            print("port number '{}' should be an integer.".format(sys.argv[1]))
+            sys.exit()
 
-    serve_dir('.')
+    if sys.argv[2:]:
+        if os.path.isdir(sys.argv[2]):
+            os.chdir(sys.argv[2])
+        else:
+            print("'{}' is not a directory or does not exist.".format(sys.argv[2]))
+            sys.exit()
+
+    serve_dir(port, '.')
