@@ -12,22 +12,25 @@ what's called.
 
 # Dependencies
 import base64, io, os, re, sys, threading, SimpleHTTPServer, SocketServer
+import argparse
 
 
 # Constants / configuration
+DEFAULT_PORT = 8000
+
 PIL_ENABLED = False
 
-## Filename of the generated index files
-INDEX_FILE_NAME = 'imageme.html'
+## Resampling mode to use when thumbnailing
+RESAMPLE = None
 
 ## Regex for matching only image files
 IMAGE_FILE_REGEX = '^.+\.(png|jpg|jpeg|tif|tiff|gif|bmp)$'
 
+## Filename of the generated index files
+INDEX_FILE_NAME = 'imageme'
+
 ## Images per row of the gallery tables
 IMAGES_PER_ROW = 3
-
-## Resampling mode to use when thumbnailing
-RESAMPLE = None
 
 ## Width in pixels of thumnbails generated with PIL
 THUMBNAIL_WIDTH = 800
@@ -107,7 +110,7 @@ def _create_index_file(
         '                padding-right: 4em;',
         '            }',
         '            .image {max-width: 100%; border-radius: 0.3em;}',
-        '            td {width: ' + str(100.0 / IMAGES_PER_ROW) + '%;}',
+        '            td {width: ' + str(100.0 / args.column) + '%;}',
         '        </style>',
         '    </head>',
         '    <body>',
@@ -124,7 +127,7 @@ def _create_index_file(
         html.append('<hr>')
     # For each subdirectory, include a link to its index file
     for directory in directories:
-        link = directory + '/' + INDEX_FILE_NAME
+        link = directory + '/' + args.index_file_name
         html += [
             '    <h3 class="header">',
             '    <a href="' + link + '">' + directory + '</a>',
@@ -151,7 +154,7 @@ def _create_index_file(
             '    </a>',
             '    </td>'
         ]
-        if table_row_count == IMAGES_PER_ROW:
+        if table_row_count == args.column:
             table_row_count = 0
             html.append('</tr>')
         table_row_count += 1
@@ -225,6 +228,7 @@ def _get_image_from_file(dir_path, image_file):
     # Try to read the image
     img = None
     try:
+        from PIL import Image
         img = Image.open(path)
     except IOError as exptn:
         print('Error loading image file %s: %s' % (path, exptn))
@@ -294,14 +298,14 @@ def _get_image_src_from_file(dir_path, image_file, force_no_processing=False):
 def _get_index_file_path(location):
     """
     Get the full file path to be used for an index file in the given location.
-    Yields location plus the constant INDEX_FILE_NAME.
+    Yields location plus the constant args.index_file_name.
 
     @param {String} location - A directory location in which we want to create
         a new index file.
 
     @return {String} A file path for usage with a new index file.
     """
-    return os.path.join(location, INDEX_FILE_NAME)
+    return os.path.join(location, args.index_file_name)
 
 
 def _get_src_from_image(img, fallback_image_file):
@@ -341,7 +345,7 @@ def _get_src_from_image(img, fallback_image_file):
 def _get_thumbnail_image_from_file(dir_path, image_file):
     """
     Get a PIL.Image from the given image file which has been scaled down to
-    THUMBNAIL_WIDTH wide.
+    args.width wide.
 
     @param {String} dir_path - The directory containing the image file
 
@@ -361,13 +365,13 @@ def _get_thumbnail_image_from_file(dir_path, image_file):
     # Get image dimensions
     img_width, img_height = img.size
     # We need to perform a resize - first, work out the scale ratio to take the
-    # image width to THUMBNAIL_WIDTH (THUMBNAIL_WIDTH:img_width ratio)
-    scale_ratio = THUMBNAIL_WIDTH / float(img_width)
+    # image width to args.width (args.width:img_width ratio)
+    scale_ratio = args.width / float(img_width)
     # Work out target image height based on the scale ratio
     target_height = int(scale_ratio * img_height)
     # Perform the resize
     try:
-        img.thumbnail((THUMBNAIL_WIDTH, target_height), resample=RESAMPLE)
+        img.thumbnail((args.width, target_height), resample=RESAMPLE)
     except IOError as exptn:
         print('WARNING: IOError when thumbnailing %s/%s: %s' % (
             dir_path, image_file, exptn
@@ -428,7 +432,7 @@ def _run_server(port):
     # you want to look at it)
     print('Your images are at http://127.0.0.1:%d/%s' % (
         port,
-        INDEX_FILE_NAME
+        args.index_file_name
     ))
 
     # Try to run the server
@@ -497,42 +501,44 @@ def serve_dir(port, dir_path):
     # the image directories
     _clean_up(created_files)
 
-def usage():
-    help_message = '''
-usage: imageme [-h] [port] [dir]
-
-positional arguments:
-      port                  The port number for server to listen. Default is 8000
-      dir                   The root directory for server to run. Default is "."
-
-optional arguments:
-      -h, --help            Show this help message and exit
-
-    '''
-    print(help_message)
-
 
 if __name__ == '__main__':
-    port = 8000
-    if sys.argv[1:]:
-        if sys.argv[1] == '-h':
-            usage()
-            sys.exit()
-        elif sys.argv[1].isdigit():
-            port = int(sys.argv[1])
-        else:
-            print("port number '{}' should be an integer.".format(sys.argv[1]))
-            sys.exit()
 
-    if sys.argv[2:]:
-        if os.path.isdir(sys.argv[2]):
-            os.chdir(sys.argv[2])
-        else:
-            print("'{}' is not a directory or does not exist.".format(sys.argv[2]))
-            sys.exit()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('port', nargs='?', type=int, default=DEFAULT_PORT,
+            help="The port number for server to listen. (default: {})".format(DEFAULT_PORT)
+            )
+    parser.add_argument('-d', '--dir', type=str, default='.',
+            help="The root directory for server to run. (default: current directory)"
+            )
+    parser.add_argument('-i', '--index-file-name', type=str,
+            default=INDEX_FILE_NAME,
+            help="The html filename for every directory. (default: {})".format(INDEX_FILE_NAME)
+            )
+    parser.add_argument('-c', '--column', type=int, default=IMAGES_PER_ROW,
+            help="Number of column(s) per row for table. (default: {})".format(IMAGES_PER_ROW)
+            )
+    parser.add_argument('-w', '--width', type=int, default=THUMBNAIL_WIDTH,
+            help="The width in pixels for every thumbnail. (default: {})".format(THUMBNAIL_WIDTH)
+            )
+    args = parser.parse_args()
+
+
+    # Check args.dir
+    if os.path.isdir(args.dir):
+        os.chdir(args.dir)
+    else:
+        print("'{}' is not a directory or does not exist".format(args.dir))
+        sys.exit()
+
+    # Add file extension for args.index_file_name
+    args.index_file_name += '.html'
+
+    print(args)
 
     PIL_ENABLED, RESAMPLE = _try_to_import_PIL()
 
+
     # Generate indices and serve from the directory downwards when run
     # as the entry point
-    serve_dir(port, '.')
+    serve_dir(args.port, args.dir)
