@@ -32,6 +32,8 @@ except ImportError:
 INDEX_FILE_NAME = 'imageme.html'
 ## Regex for matching only image files
 IMAGE_FILE_REGEX = '^.+\.(png|jpg|jpeg|tif|tiff|gif|bmp)$'
+## Regex for matching only HTML5 suppored video files
+VIDEO_FILE_REGEX = '^.+\.(mp4|ogg|ogv|webm)$'
 ## Images per row of the gallery tables
 IMAGES_PER_ROW = 3
 ## Resampling mode to use when thumbnailing
@@ -70,7 +72,7 @@ def _clean_up(paths):
         os.unlink(path)
 
 def _create_index_file(
-        root_dir, location, image_files, dirs, force_no_processing=False):
+        root_dir, location, image_files, video_files, dirs, force_no_processing=False):
     """
     Create an index file in the given location, supplying known lists of
     present image files and subdirectories.
@@ -82,6 +84,9 @@ def _create_index_file(
         file will be created here.
 
     @param {[String]} image_files - A list of image file names in the location.
+        These will be displayed in the index file's gallery.
+
+    @param {[String]} video_files - A list of video file names in the location.
         These will be displayed in the index file's gallery.
 
     @param {[String]} dirs - The subdirectories of the location directory.
@@ -96,8 +101,9 @@ def _create_index_file(
     """
     # Put together HTML as a list of the lines we'll want to include
     # Issue #2 exists to do this better than HTML in-code
-    header_text = \
-        'imageMe: ' + location + ' [' + str(len(image_files)) + ' image(s)]'
+    header_text = 'imageMe: {0} [{1} image(s)] [{2} video(s)]'.format(
+                        location, str(len(image_files)), str(len(video_files))
+                    )
     html = [
         '<!DOCTYPE html>',
         '<html>',
@@ -136,31 +142,58 @@ def _create_index_file(
             '    </h3>'
         ]
     # Populate the image gallery table
-    # Counter to cycle down through table rows
-    table_row_count = 1
-    html += ['<hr>', '<table>']
-    # For each image file, potentially create a new <tr> and create a new <td>
-    for image_file in image_files:
-        if table_row_count == 1:
-            html.append('<tr>')
-        img_src = _get_thumbnail_src_from_file(
-            location, image_file, force_no_processing
-        )
-        link_target = _get_image_link_target_from_file(
-            location, image_file, force_no_processing
-        )
-        html += [
-            '    <td>',
-            '    <a href="' + link_target + '">',
-            '        <img class="image" src="' + img_src + '">',
-            '    </a>',
-            '    </td>'
-        ]
-        if table_row_count == IMAGES_PER_ROW:
-            table_row_count = 0
-            html.append('</tr>')
-        table_row_count += 1
-    html += ['</tr>', '</table>']
+
+    if video_files:
+        # Counter to cycle down through table rows
+        table_row_count = 1
+        html += ['<hr>', '<table>']
+
+        # For each video file, potentially create a new <tr> and create a new <td>
+        for video_file in video_files:
+            if table_row_count == 1:
+                html.append('<tr>')
+
+            html += [
+                '  <video controls preload width="' + str(100.0 / IMAGES_PER_ROW) + '%' + '">',
+                '    <source src="' + video_file + '">',
+                '    Your browser does not support HTML5 video.'
+                '  </video>',
+            ]
+
+            if table_row_count == IMAGES_PER_ROW:
+                table_row_count = 0
+                html.append('</tr>')
+            table_row_count += 1
+
+        html += ['</tr>', '</table>']
+
+    if image_files:
+        # Counter to cycle down through table rows
+        table_row_count = 1
+        html += ['<hr>', '<table>']
+        # For each image file, potentially create a new <tr> and create a new <td>
+        for image_file in image_files:
+            if table_row_count == 1:
+                html.append('<tr>')
+            img_src = _get_thumbnail_src_from_file(
+                location, image_file, force_no_processing
+            )
+            link_target = _get_image_link_target_from_file(
+                location, image_file, force_no_processing
+            )
+            html += [
+                '    <td>',
+                '    <a href="' + link_target + '">',
+                '        <img class="image" src="' + img_src + '">',
+                '    </a>',
+                '    </td>'
+            ]
+            if table_row_count == IMAGES_PER_ROW:
+                table_row_count = 0
+                html.append('</tr>')
+            table_row_count += 1
+        html += ['</tr>', '</table>']
+
     html += [
         '    </div>',
         '    </body>',
@@ -198,13 +231,15 @@ def _create_index_files(root_dir, force_no_processing=False):
         dirs = sorted(dirs)
         # Get image files - all files in the directory matching IMAGE_FILE_REGEX
         image_files = [f for f in files if re.match(IMAGE_FILE_REGEX, f)]
+        video_files = [f for f in files if re.match(VIDEO_FILE_REGEX, f)]
         # Sort the image files by name
         image_files = sorted(image_files)
+        video_files = sorted(video_files)
         # Create this directory's index file and add its name to the created
         # files list
         created_files.append(
             _create_index_file(
-                root_dir, here, image_files, dirs, force_no_processing
+                root_dir, here, image_files, video_files, dirs, force_no_processing
             )
         )
     # Return the list of created files
