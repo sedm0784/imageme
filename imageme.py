@@ -451,6 +451,17 @@ def _get_thumbnail_src_from_file(dir_path, image_file, force_no_processing=False
     img = _get_thumbnail_image_from_file(dir_path, image_file)
     return _get_src_from_image(img, image_file)
 
+class ThreadedServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+    # Configure allow_reuse_address to make re-runs of the script less painful -
+    # if this is not True then waiting for the address to be freed after the
+    # last run can block a subsequent run
+    SocketServer.TCPServer.allow_reuse_address = True
+
+    # Let server can be closed at anytime.
+    # Don't need to wait for request(s) completed.
+    SocketServer.ThreadingMixIn.daemon_threads = True
+    pass
+
 def _run_server():
     """
     Run the image server. This is blocking. Will handle user KeyboardInterrupt
@@ -461,21 +472,20 @@ def _run_server():
     """
     # Get the port to run on
     port = _get_server_port()
-    # Configure allow_reuse_address to make re-runs of the script less painful -
-    # if this is not True then waiting for the address to be freed after the
-    # last run can block a subsequent run
-    SocketServer.TCPServer.allow_reuse_address = True
+
     # Create the server instance
-    server = SocketServer.TCPServer(
+    server = ThreadedServer(
         ('', port),
         SimpleHTTPServer.SimpleHTTPRequestHandler
     )
+
     # Print out before actually running the server (cheeky / optimistic, however
     # you want to look at it)
     print('Your images are at http://127.0.0.1:%d/%s' % (
         port,
         INDEX_FILE_NAME
     ))
+
     # Try to run the server
     try:
         # Run it - this call blocks until the server is killed
