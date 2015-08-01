@@ -123,7 +123,7 @@ def _create_index_file(
         '    <head>',
         '        <title>imageMe</title>'
         '        <style>',
-        '            html, body {margin: 0;padding: 0;}',
+        '            html, body {margin: 0; padding: 0;}',
         '            .header {text-align: right;}',
         '            .content {',
         '                padding: 3em;',
@@ -135,9 +135,10 @@ def _create_index_file(
         '        </style>',
         '    </head>',
         '    <body>',
-        '    <div class="content">',
+        '    <div class="content" align="center">',
         '        <h2 class="header">' + header_text + '</h2>'
     ]
+
     # Populate the present subdirectories - this includes '..' unless we're at
     # the top level
     directories = []
@@ -155,69 +156,69 @@ def _create_index_file(
             '    </h3>'
         ]
 
-    # Populate the image gallery table
-    if video_files:
+    files = sorted(image_files + video_files)
+    if args.separate_image_and_video:
+        files = image_files + [None] + video_files
+
+    # Populate the gallery table
+    if files:
         # Counter to cycle down through table rows
-        table_row_count = 1
+        table_column_count = 1
         html += ['<hr>', '<table>']
 
-        # For each video file, potentially create a new <tr> and create a new <td>
-        for video_file in video_files:
-            if table_row_count == 1:
+        # For each file, potentially create a new <tr> and create a new <td>
+        for file in files:
+            if table_column_count == 1:
                 html.append('<tr>')
 
-            html += [
-                '  <video controls preload width="' + str(100.0 / args.column) + '%' + '">',
-                '    <source src="' + video_file + '">',
-                '    Your browser does not support HTML5 video.'
-                '  </video>',
-            ]
+            if file in video_files:
+                html += [
+                    '<td>',
+                    '  <video controls preload width="100%">',
+                    '    <source src="' + file + '">',
+                    '    Your browser does not support HTML5 video.'
+                    '  </video>',
+                    '</td>'
+                ]
 
-            if table_row_count == args.column:
-                table_row_count = 0
+            if file in image_files:
+                img_src = _get_thumbnail_src_from_file(
+                    location, file, force_no_processing
+                )
+                link_target = _get_image_link_target_from_file(
+                    location, file, force_no_processing
+                )
+                html += [
+                    '<td>',
+                    '   <a href="' + link_target + '">',
+                    '        <img class="image" src="' + img_src + '">',
+                    '   </a>',
+                    '</td>'
+                ]
+
+            if table_column_count == args.column or file == None:
+                table_column_count = 0
                 html.append('</tr>')
-            table_row_count += 1
 
-        html += ['</tr>', '</table>']
+            table_column_count += 1
 
-    if image_files:
-        # Counter to cycle down through table rows
-        table_row_count = 1
-        html += ['<hr>', '<table>']
-        # For each image file, potentially create a new <tr> and create a new <td>
-        for image_file in image_files:
-            if table_row_count == 1:
-                html.append('<tr>')
-            img_src = _get_thumbnail_src_from_file(
-                location, image_file, force_no_processing
-            )
-            link_target = _get_image_link_target_from_file(
-                location, image_file, force_no_processing
-            )
-            html += [
-                '    <td>',
-                '    <a href="' + link_target + '">',
-                '        <img class="image" src="' + img_src + '">',
-                '    </a>',
-                '    </td>'
-            ]
-            if table_row_count == args.column:
-                table_row_count = 0
-                html.append('</tr>')
-            table_row_count += 1
-        html += ['</tr>', '</table>']
+        if table_column_count != 1:
+            html += ['</tr>']
+        html += ['</table>']
 
     html += [
         '    </div>',
         '    </body>',
         '</html>'
     ]
+
     # Actually create the file, now we've put together the HTML content
     index_file_path = _get_index_file_path(location)
     print('Creating index file %s' % index_file_path)
     index_file = open(index_file_path, 'w')
     index_file.write('\n'.join(html))
     index_file.close()
+
     # Return the path for cleaning up later
     return index_file_path
 
@@ -240,14 +241,16 @@ def _create_index_files(root_dir, force_no_processing=False):
     # Walk the root dir downwards, creating index files as we go
     for here, dirs, files in os.walk(root_dir):
         print('Processing %s' % here)
+
         # Sort the subdirectories by name
         dirs = sorted(dirs)
-        # Get image files - all files in the directory matching IMAGE_FILE_REGEX
-        image_files = [f for f in files if re.match(IMAGE_FILE_REGEX, f)]
-        video_files = [f for f in files if re.match(VIDEO_FILE_REGEX, f)]
-        # Sort the image files by name
-        image_files = sorted(image_files)
-        video_files = sorted(video_files)
+
+        # Get image files - sort all files in the directory matching IMAGE_FILE_REGEX
+        image_files = sorted([f for f in files if re.match(IMAGE_FILE_REGEX, f)])
+
+        # Get image files - sort all files in the directory matching VIDEO_FILE_REGEX
+        video_files = sorted([f for f in files if re.match(VIDEO_FILE_REGEX, f)])
+
         # Create this directory's index file and add its name to the created
         # files list
         created_files.append(
@@ -567,21 +570,29 @@ def serve_dir(port, dir_path):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('port', nargs='?', type=int, default=DEFAULT_PORT,
+    parser.add_argument('port', nargs='?',
+            type=int, default=DEFAULT_PORT,
             help="The port number for server to listen. (default: {})".format(DEFAULT_PORT)
             )
-    parser.add_argument('-d', '--dir', type=str, default='.',
+    parser.add_argument('-d', '--dir',
+            type=str, default='.',
             help="The root directory for server to run. (default: current directory)"
             )
-    parser.add_argument('-i', '--index-file-name', type=str,
-            default=INDEX_FILE_NAME,
+    parser.add_argument('-i', '--index-file-name',
+            type=str, default=INDEX_FILE_NAME,
             help="The html filename for every directory. (default: {})".format(INDEX_FILE_NAME)
             )
-    parser.add_argument('-c', '--column', type=int, default=IMAGES_PER_ROW,
-            help="Number of column(s) per row for table. (default: {})".format(IMAGES_PER_ROW)
+    parser.add_argument('-c', '--column',
+            type=int, default=IMAGES_PER_ROW,
+            help="Number of columns per row for table. (default: {})".format(IMAGES_PER_ROW)
             )
-    parser.add_argument('-w', '--width', type=int, default=THUMBNAIL_WIDTH,
+    parser.add_argument('-w', '--width',
+            type=int, default=THUMBNAIL_WIDTH,
             help="The width in pixels for every thumbnail. (default: {})".format(THUMBNAIL_WIDTH)
+            )
+    parser.add_argument('-s', '--separate-image-and-video',
+            action='store_true',
+            help="Separate the images and the videos in webpage arrangement."
             )
     args = parser.parse_args()
 
