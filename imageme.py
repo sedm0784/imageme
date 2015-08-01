@@ -11,8 +11,22 @@ what's called.
 """
 
 # Dependencies
-import base64, io, os, re, sys, threading, SimpleHTTPServer, SocketServer
+try:
+    # Python 2.x
+    import SocketServer
+    import SimpleHTTPServer
+except ImportError:
+    # Python 3.x
+    import socketserver as SocketServer
+    import http.server as SimpleHTTPServer
+
 import argparse
+import base64
+import io
+import os
+import sys
+import threading
+import re
 
 
 # Constants / configuration
@@ -510,6 +524,7 @@ def _try_to_import_PIL():
             'performance you could out of imageMe. Install Pillow (' +\
             'https://github.com/python-pillow/Pillow) to enable support.'
         )
+        return (False, None)
     else:
         print('Success! Enjoy your supercharged imageMe.')
         return (True, Image.NEAREST)
@@ -581,10 +596,7 @@ if __name__ == '__main__':
     # Add file extension for args.index_file_name
     args.index_file_name += '.html'
 
-    print(args)
-
     PIL_ENABLED, RESAMPLE = _try_to_import_PIL()
-
 
     # Generate indices and serve from the directory downwards when run
     # as the entry point
