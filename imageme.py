@@ -124,7 +124,7 @@ def _create_index_file(
         '        <title>imageMe</title>'
         '        <style>',
         '            html, body {margin: 0; padding: 0;}',
-        '            .header {text-align: right;}',
+        '            .table  {align: center;}',
         '            .content {',
         '                padding: 3em;',
         '                padding-left: 4em;',
@@ -135,7 +135,7 @@ def _create_index_file(
         '        </style>',
         '    </head>',
         '    <body>',
-        '    <div class="content" align="center">',
+        '    <div class="content">',
         '        <h2 class="header">' + header_text + '</h2>'
     ]
 
@@ -151,7 +151,7 @@ def _create_index_file(
     for directory in directories:
         link = directory + '/' + args.index_file_name
         html += [
-            '    <h3 class="header">',
+            '    <h3>',
             '    <a href="' + link + '">' + directory + '</a>',
             '    </h3>'
         ]
