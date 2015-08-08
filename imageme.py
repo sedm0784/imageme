@@ -459,7 +459,7 @@ def _get_thumbnail_src_from_file(dir_path, image_file, force_no_processing=False
     img = _get_thumbnail_image_from_file(dir_path, image_file)
     return _get_src_from_image(img, image_file)
 
-class ThreadedServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+class ThreadingServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     # Configure allow_reuse_address to make re-runs of the script less painful -
     # if this is not True then waiting for the address to be freed after the
     # last run can block a subsequent run
@@ -487,7 +487,7 @@ def _run_server(port):
     SocketServer.TCPServer.allow_reuse_address = True
 
     # Create the server instance
-    server = ThreadedServer(
+    server = ThreadingServer(
         ('', port),
         SimpleHTTPServer.SimpleHTTPRequestHandler
     )
