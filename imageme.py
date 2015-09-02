@@ -246,10 +246,10 @@ def _create_index_files(root_dir, force_no_processing=False):
         dirs = sorted(dirs)
 
         # Get image files - sort all files in the directory matching IMAGE_FILE_REGEX
-        image_files = sorted([f for f in files if re.match(IMAGE_FILE_REGEX, f)])
+        image_files = sorted([f for f in files if re.match(IMAGE_FILE_REGEX, f, re.IGNORECASE)])
 
         # Get image files - sort all files in the directory matching VIDEO_FILE_REGEX
-        video_files = sorted([f for f in files if re.match(VIDEO_FILE_REGEX, f)])
+        video_files = sorted([f for f in files if re.match(VIDEO_FILE_REGEX, f, re.IGNORECASE)])
 
         # Create this directory's index file and add its name to the created
         # files list
