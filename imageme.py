@@ -81,8 +81,11 @@ def _clean_up(paths):
     print('Cleaning up')
     # Iterate over the given paths, unlinking them
     for path in paths:
-        print('Removing %s' % path)
-        os.unlink(path)
+        if os.path.exists(path):
+            print('Removing %s' % path)
+            os.unlink(path)
+        else:
+            print('%s Not found. Skipped.' % path)
 
 def _create_index_file(
         root_dir, location, image_files, video_files, dirs, force_no_processing=False):
