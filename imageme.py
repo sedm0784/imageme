@@ -393,7 +393,8 @@ def _get_src_from_image(img, fallback_image_file):
         img.save(bytesio, target_format)
         byte_value = bytesio.getvalue()
         b64 = base64.b64encode(byte_value)
-        return 'data:image/%s;base64,%s' % (target_format.lower(), b64)
+        return 'data:image/%s;base64,%s' % (target_format.lower(),
+                                            b64.decode('ascii'))
     except IOError as exptn:
         print('IOError while saving image bytes: %s' % exptn)
         return fallback_image_file
